@@ -6,15 +6,18 @@ metadata:
 spec:
   containers:
     - name: kaniko
-        image: gcr.io/kaniko-project/executor:debug
-        imagePullPolicy: Always
-        command:
-          - sleep
-        args:
-          - 99d
-        volumeMounts:
-          - name: jenkins-docker-cfg
-            mountPath: /kaniko/.docker
+      image: gcr.io/kaniko-project/executor:v1.6.0-debug
+      imagePullPolicy: Always
+      env:
+        - name: container
+          value: kube
+      command:
+        - sleep
+      args:
+        - 99d
+      volumeMounts:
+        - name: jenkins-docker-cfg
+          mountPath: /kaniko/.docker
     - name: maven
       image: maven:alpine
       command:
