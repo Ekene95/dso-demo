@@ -84,8 +84,7 @@ sh 'scan --type java,depscan --build'
 }
 post {
 success {
-archiveArtifacts allowEmptyArchive: true, artifacts:
-'reports/*', fingerprint: true, onlyIfSuccessful: true
+archiveArtifacts allowEmptyArchive: true, artifacts: 'reports/*', fingerprint: true, onlyIfSuccessful: true
 }
 }
 }
