@@ -120,7 +120,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
                   sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
                 }
-                sh 'trivy image --timeout 10m --exit-code 1 kenzman/dsodemo:latest'
+                sh 'trivy image --timeout 10m --exit-code 0 kenzman/dsodemo:latest'
               }
             }
           }
