@@ -103,14 +103,24 @@ parallel {
 stage('Image Linting') {
 	steps {
 container('docker-tools') {
-sh 'dockle --timeout 600s docker.io/kenzman/dso-demo'
+              script {
+                // Docker login before scanning with dockle
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                  sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
+                }
+sh 'dockle --timeout 600s docker.io/kenzman/dsodemo:latest'
 }
 }
 }
 stage('Image Scan') {
 steps {
 container('docker-tools') {
-sh 'trivy image --timeout 10m --exit-code 1 kenzman/dso-demo'
+              script {
+                // Docker login before scanning with trivy
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                  sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
+                }
+sh 'trivy image --timeout 10m --exit-code 1 kenzman/dsodemo:latest'
 }
 }
 }
