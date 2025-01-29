@@ -6,6 +6,7 @@ pipeline {
       idleMinutes 1
     }
   }
+
   stages {
     stage('Build') {
       parallel {
@@ -18,6 +19,7 @@ pipeline {
         }
       }
     }
+
     stage('Static Analysis') {
       parallel {
         stage('Unit Tests') {
@@ -29,51 +31,46 @@ pipeline {
         }
 
         stage('Generate SBOM') {
-steps {
-container('maven') {
-sh 'mvn org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom'
-}
-}
-post {
-success {
-//dependencyTrackPublisher projectName: 'sample-spring-app',
-//projectVersion: '0.0.1', artifact: 'target/bom.xml', autoCreateProjects:
-//true, synchronous: true
-archiveArtifacts allowEmptyArchive: true, artifacts:
-'target/bom.xml', fingerprint: true, onlyIfSuccessful: true
-      }
-    }
-  }
+          steps {
+            container('maven') {
+              sh 'mvn org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom'
+            }
+          }
+          post {
+            success {
+              archiveArtifacts allowEmptyArchive: true, artifacts: 'target/bom.xml', fingerprint: true, onlyIfSuccessful: true
+            }
+          }
+        }
+
         stage('SCA') {
-steps {
-container('maven') {
-catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-sh 'mvn org.owasp:dependency-check-maven:check'
-      }  
-    }
-  }
-post {
-always {
-archiveArtifacts allowEmptyArchive: true, artifacts:
-'target/dependency-check-report.html', fingerprint: true, onlyIfSuccessful:
-true
-// dependencyCheckPublisher pattern: 'report.xml'
-      }
-    }
-  }  
-stage('OSS License Checker') {
-steps {
-container('licensefinder') {
-sh 'ls -al'
-sh '''#!/bin/bash --login
-/bin/bash --login
-rvm use default
-gem install license_finder
-license_finder
-'''
-      }
-    }
-  }
+          steps {
+            container('maven') {
+              catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                sh 'mvn org.owasp:dependency-check-maven:check'
+              }
+            }
+          }
+          post {
+            always {
+              archiveArtifacts allowEmptyArchive: true, artifacts: 'target/dependency-check-report.html', fingerprint: true, onlyIfSuccessful: true
+            }
+          }
+        }
+
+        stage('OSS License Checker') {
+          steps {
+            container('licensefinder') {
+              sh 'ls -al'
+              sh '''#!/bin/bash --login
+              /bin/bash --login
+              rvm use default
+              gem install license_finder
+              license_finder
+              '''
+            }
+          }
+        }
       }
     }
 
@@ -86,46 +83,51 @@ license_finder
             }
           }
         }
-    stage('OCI Image BnP') {
-steps {
-container('kaniko') {
-sh '''
-  /kaniko/executor --verbosity debug -f `pwd`/Dockerfile -c `pwd` --insecure --skip-tls-verify --cache=true --destination=docker.io/kenzman/dsodemo:latest
-  '''
+
+        stage('OCI Image BnP') {
+          steps {
+            container('kaniko') {
+              sh '''
+                /kaniko/executor --verbosity debug -f `pwd`/Dockerfile -c `pwd` --insecure --skip-tls-verify --cache=true --destination=docker.io/kenzman/dsodemo:latest
+              '''
+            }
           }
         }
       }
-
-      }
     }
- stage('Image Analysis') {
-parallel {
-stage('Image Linting') {
-	steps {
-container('docker-tools') {
+
+    stage('Image Analysis') {
+      parallel {
+        stage('Image Linting') {
+          steps {
+            container('docker-tools') {
               script {
                 // Docker login before scanning with dockle
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
                   sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
                 }
-sh 'dockle --timeout 600s docker.io/kenzman/dsodemo:latest'
-}
-}
-}
-stage('Image Scan') {
-steps {
-container('docker-tools') {
+                sh 'dockle --timeout 600s docker.io/kenzman/dsodemo:latest'
+              }
+            }
+          }
+        }
+
+        stage('Image Scan') {
+          steps {
+            container('docker-tools') {
               script {
                 // Docker login before scanning with trivy
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
                   sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
                 }
-sh 'trivy image --timeout 10m --exit-code 1 kenzman/dsodemo:latest'
-}
-}
-}
-}
-}
+                sh 'trivy image --timeout 10m --exit-code 1 kenzman/dsodemo:latest'
+              }
+            }
+          }
+        }
+      }
+    }
+
     stage('Deploy to Dev') {
       steps {
         // TODO
