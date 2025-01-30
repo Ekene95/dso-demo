@@ -88,7 +88,7 @@ pipeline {
           steps {
             container('kaniko') {
               sh '''
-                /kaniko/executor --verbosity debug -f `pwd`/Dockerfile -c `pwd` --insecure --skip-tls-verify --cache=true --destination=docker.io/kenzman/dsodemo:latest
+                /kaniko/executor --verbosity debug -f `pwd`/Dockerfile -c `pwd` --insecure --skip-tls-verify --cache=true --destination=docker.io/kenzman/dsodemo:v1
               '''
             }
           }
@@ -106,7 +106,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
                   sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
                 }
-                sh 'dockle --timeout 600s docker.io/kenzman/dsodemo:latest'
+                sh 'dockle --timeout 600s docker.io/kenzman/dsodemo:v1'
               }
             }
           }
@@ -120,7 +120,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
                   sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
                 }
-                sh 'trivy image --timeout 10m --exit-code 0 kenzman/dsodemo:latest'
+                sh 'trivy image --timeout 10m --exit-code 0 kenzman/dsodemo:v1'
               }
             }
           }
