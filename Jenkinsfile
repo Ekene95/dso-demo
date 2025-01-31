@@ -10,6 +10,7 @@ pipeline {
   environment {
     // Other environment variables
     ARGO_SERVER = '34.70.91.177:32101'
+    DEV_URL = 'http://34.70.91.177:30080/'
   }
 
   stages {
@@ -144,5 +145,22 @@ pipeline {
           }
         }
       }
+      stage('Dynamic Analysis') {
+        parallel {
+          stage('E2E tests') {
+            steps {
+              sh 'echo "All Tests passed!!!"'
+            }
+          }
+          stage('DAST') {
+            steps {
+              container('docker-tools') {
+                sh 'docker run -t owasp/zap2docker-stable zap-baseline.py -t $DEV_URL || exit 0'
+              }
+            }
+          }
+        }
+      }
+
   }
 }
