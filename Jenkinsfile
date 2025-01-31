@@ -135,17 +135,14 @@ pipeline {
 
     stage('Deploy to Dev') {
       steps {
-        // TODO
-        sh "echo deploying dev environment"
-      }
-
-      environment {
-        AUTH_TOKEN = credentials('argocd-jenkins-deployer-token') // Use Jenkins credential for Argocd token
-      }
-
-      steps {
-        // GitHub authentication and deployment to ArgoCD using the secure GitHub token
-        withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+        script {
+          // TODO: Add actual deploy commands here
+          sh "echo deploying dev environment"
+        }
+        
+        // Using credentials for ArgoCD token and GitHub token
+        withCredentials([string(credentialsId: 'argocd-jenkins-deployer-token', variable: 'AUTH_TOKEN'),
+                         string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
           container('docker-tools') {
             sh '''
               echo "Using GitHub Token: $GITHUB_TOKEN"  // Optional: You can add your own GitHub API calls if needed
