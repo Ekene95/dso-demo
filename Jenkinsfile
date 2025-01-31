@@ -134,14 +134,25 @@ pipeline {
     }
 
     stage('Deploy to Dev') {
-      environment {
-        AUTH_TOKEN = credentials('argocd-jenkins-deployer-token')
-      }
       steps {
+        // TODO
         sh "echo deploying dev environment"
-        container('docker-tools') {
-          sh 'docker run -t schoolofdevops/argocd-cli argocd app sync dso-demo --insecure --server $ARGO_SERVER --auth-token $AUTH_TOKEN'
-          sh 'docker run -t schoolofdevops/argocd-cli argocd app wait dso-demo --health --timeout 300 --insecure --server $ARGO_SERVER --auth-token $AUTH_TOKEN'
+      }
+
+      environment {
+        AUTH_TOKEN = credentials('argocd-jenkins-deployer-token') // Use Jenkins credential for Argocd token
+      }
+
+      steps {
+        // GitHub authentication and deployment to ArgoCD using the secure GitHub token
+        withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+          container('docker-tools') {
+            sh '''
+              echo "Using GitHub Token: $GITHUB_TOKEN"  // Optional: You can add your own GitHub API calls if needed
+              docker run -t schoolofdevops/argocd-cli argocd app sync dso-demo --insecure --server $ARGO_SERVER --auth-token $AUTH_TOKEN
+              docker run -t schoolofdevops/argocd-cli argocd app wait dso-demo --health --timeout 300 --insecure --server $ARGO_SERVER --auth-token $AUTH_TOKEN
+            '''
+          }
         }
       }
     }
