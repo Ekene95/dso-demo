@@ -149,3 +149,4 @@ dso-demo --health --timeout 300 --insecure --server $ARGO_SERVER
 
   }
 }
+}
