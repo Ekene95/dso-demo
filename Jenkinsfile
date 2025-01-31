@@ -7,6 +7,11 @@ pipeline {
     }
   }
 
+  environment {
+    // Other environment variables
+    ARGO_SERVER = '34.70.91.177:32101'
+  }
+
   stages {
     stage('Build') {
       parallel {
@@ -129,11 +134,16 @@ pipeline {
     }
 
     stage('Deploy to Dev') {
+      environment {
+        AUTH_TOKEN = credentials('argocd-jenkins-deployer-token')
+      }
       steps {
-        // TODO
-        sh "echo done"
+        sh "echo deploying dev environment"
+        container('docker-tools') {
+          sh 'docker run -t schoolofdevops/argocd-cli argocd app sync dso-demo --insecure --server $ARGO_SERVER --auth-token $AUTH_TOKEN'
+          sh 'docker run -t schoolofdevops/argocd-cli argocd app wait dso-demo --health --timeout 300 --insecure --server $ARGO_SERVER --auth-token $AUTH_TOKEN'
+        }
       }
     }
   }
 }
-
