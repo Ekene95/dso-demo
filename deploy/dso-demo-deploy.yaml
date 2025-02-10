@@ -16,6 +16,10 @@ spec:
       creationTimestamp: null
       labels:
         app: dso-demo
+      annotations:
+        vault.hashicorp.com/agent-inject: 'true'
+        vault.hashicorp.com/role: 'dso-demo'
+        vault.hashicorp.com/agent-inject-secret-database: 'secret/dso-demo/database'
     spec:
       containers:
       - image: kenzman/dsodemo:v1
@@ -44,6 +48,6 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
-      automountServiceAccountToken: false
+      #automountServiceAccountToken: false
       serviceAccountName: dso-demo
 status: {}
