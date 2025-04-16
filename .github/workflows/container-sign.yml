@@ -1,4 +1,4 @@
-name: Build, Sign, and Push Docker Image (for develop only)
+name: Build, Sign, and Push Docker Image (develop only)
 
 on:
   push:
