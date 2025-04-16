@@ -39,6 +39,9 @@ jobs:
       - name: Set COSIGN_PASSWORD
         run: echo "COSIGN_PASSWORD=${{ secrets.COSIGN_PASSWORD }}" >> $GITHUB_ENV
 
+      - name: Set GITHUB_TOKEN
+        run: echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+
       - name: Generate key pair with Cosign
         run: |
           cosign generate-key-pair github://Ekene95/dso-demo
