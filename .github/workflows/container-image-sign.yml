@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: your-org/your-image
+  IMAGE_NAME: kenzman/provenance
 
 jobs:
   build-sign-push:
@@ -22,7 +22,9 @@ jobs:
 
       - name: Set up image tag (develop-SHORT_SHA)
         id: versioning
-        run: echo "IMAGE_TAG=develop-${GITHUB_SHA::7}" >> $GITHUB_ENV
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "IMAGE_TAG=develop-${SHORT_SHA}" >> $GITHUB_ENV
 
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
@@ -37,10 +39,14 @@ jobs:
       - name: Set COSIGN_PASSWORD
         run: echo "COSIGN_PASSWORD=${{ secrets.COSIGN_PASSWORD }}" >> $GITHUB_ENV
 
+      - name: Generate key pair with Cosign
+        run: |
+          cosign generate-key-pair github://Ekene95/dso-demo
+
       - name: Sign Docker image with Cosign
         env:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-	run: |
+        run: |
           cosign sign --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
 
       - name: Push Docker image to Docker Hub
