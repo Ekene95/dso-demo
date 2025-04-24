@@ -61,7 +61,6 @@ jobs:
         run: |
           cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
 
-
 #      - name: Sign Docker image with Cosign
 #        env:
 #          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
