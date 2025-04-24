@@ -39,7 +39,7 @@ jobs:
           docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.1.1
+        uses: sigstore/cosign-installer@main
 
 #Debugging steps
       - name: Debug Keys
