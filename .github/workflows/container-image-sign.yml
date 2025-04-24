@@ -41,8 +41,8 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.1.1
 
-      - name: Set COSIGN_PASSWORD
-        run: echo "COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}" >> $GITHUB_ENV
+#      - name: Set COSIGN_PASSWORD
+#        run: echo "COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}" >> $GITHUB_ENV
 
 #      - name: Generate key pair with Cosign
 #        run: |
