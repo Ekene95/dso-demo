@@ -41,18 +41,11 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.1.1
 
-#      - name: Set COSIGN_PASSWORD
-#        run: echo "COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}" >> $GITHUB_ENV
-
-#      - name: Generate key pair with Cosign
-#        run: |
-#          cosign generate-key-pair github://Ekene95/dso-demo
-
       - name: Sign Docker image with Cosign
         env:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-	run: |
+        run: |
           cosign sign --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
 
       - name: Push Docker image to Docker Hub
