@@ -41,29 +41,41 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@main
 
-#Debugging steps
-      - name: Debug Keys
-        run: |
-          echo "Private key length: ${#COSIGN_PRIVATE_KEY}"
-          echo "Password length: ${#COSIGN_PASSWORD}"
-        env:
-          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-
-      - name: Sign Docker image with Cosign
-        env:
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-        run: |
-          cosign sign --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
-
-      - name: Push Docker image to Docker Hub
+      - name: Push Docker image and get digest
         run: |
           docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+          # Extract digest (format: sha256:abc123...)
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $REGISTRY/$IMAGE_NAME:$IMAGE_TAG | cut -d'@' -f2)
+          echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
 
-      - name: Verify Signature with Cosign
+      - name: Sign with Cosign (Digest-Based)
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+        run: |
+          cosign sign --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
+
+      - name: Verify Signature
         env:
           COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
         run: |
-          cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+          cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
+
+
+#      - name: Sign Docker image with Cosign
+#        env:
+#          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+#          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+#        run: |
+#          cosign sign --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+#
+#      - name: Push Docker image to Docker Hub
+#        run: |
+#          docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+
+#      - name: Verify Signature with Cosign
+#        env:
+#          COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+#        run: |
+#          cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
 
