@@ -53,7 +53,7 @@ jobs:
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
         run: |
-          cosign sign --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
 
       - name: Verify Signature
         env:
