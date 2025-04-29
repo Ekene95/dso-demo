@@ -39,17 +39,15 @@ jobs:
       - name: Snyk Container Scan
         id: snyk_container_scan
         run: |
-          snyk container test $REGISTRY/$IMAGE_NAME:$IMAGE_TAG --severity-threshold=medium
+          snyk container test --org=ekene95 --tags=dev,container  $REGISTRY/$IMAGE_NAME:$IMAGE_TAG --severity-threshold=medium
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         continue-on-error: true
 
       - name: Snyk Container Monitor
         run: |
-          snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
-            --project-name="$IMAGE_NAME:$IMAGE_TAG" \
-            --debug \
-            --log-level=trace
+          snyk container monitor --org=ekene95 --tags=dev,container  $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            --project-name="$IMAGE_NAME:$IMAGE_TAG"
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
