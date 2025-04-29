@@ -9,11 +9,6 @@ env:
   REGISTRY: docker.io
   IMAGE_NAME: kenzman/provenance
 
-#permissions:
-#  contents: write
-#  actions: write
-#  id-token: write
-
 jobs:
   build-sign-push:
     runs-on: ubuntu-latest
@@ -38,6 +33,23 @@ jobs:
         run: |
           docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
 
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Snyk Container Scan
+        id: snyk_container_scan
+        run: |
+          ./snyk container test $REGISTRY/$IMAGE_NAME:$IMAGE_TAG --severity-threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+
+      - name: Fail Build on Snyk Vulnerabilities
+        if: steps.snyk_container_scan.outcome == 'failure'
+        run: |
+          echo "Snyk found vulnerabilities in the container image!"
+          exit 1
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@main
 
@@ -60,21 +72,4 @@ jobs:
           COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
         run: |
           cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
-
-#      - name: Sign Docker image with Cosign
-#        env:
-#          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-#          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-#        run: |
-#          cosign sign --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
-#
-#      - name: Push Docker image to Docker Hub
-#        run: |
-#          docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
-
-#      - name: Verify Signature with Cosign
-#        env:
-#          COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
-#        run: |
-#          cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
 
