@@ -89,7 +89,7 @@ jobs:
           cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
 
       - name: Create ZAP workspace
-       run: mkdir -p zap-reports
+        run: mkdir -p zap-reports
         
       - name: Run ZAP Scan
         env:
