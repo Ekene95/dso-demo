@@ -93,11 +93,13 @@ jobs:
           DEV_URL: https://6832-105-113-78-20.ngrok-free.app  # Set this secret to your Ngrok URL
         run: |
           docker run --rm \
-            -v $(pwd):/zap/reports \
-            zaproxy/zap-stable zap-baseline.py \
+            -v $(pwd)/zap-reports:/zap/wrk:rw \  # Mount writable volume
+            owasp/zap2docker-stable zap-baseline.py \
             -t $DEV_URL \
-            -r zap-report.html \
-            -x report.xml
+            -r report.html \
+            -x report.xml \
+            -J report.json \
+            -w report.md
           
       - name: Upload Report
         uses: actions/upload-artifact@v4
