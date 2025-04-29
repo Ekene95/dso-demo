@@ -46,7 +46,9 @@ jobs:
 
       - name: Snyk Container Monitor
         run: |
-          snyk container monitor --org=ekene95 --tags=dev,container  $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+          snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            --org=ekene95 \
+            --project-tags=environment=dev,type=container \
             --project-name="$IMAGE_NAME:$IMAGE_TAG"
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
