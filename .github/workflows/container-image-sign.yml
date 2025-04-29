@@ -88,23 +88,24 @@ jobs:
         run: |
           cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
 
+      - name: Create ZAP workspace
+       run: mkdir -p zap-reports
+        
       - name: Run ZAP Scan
         env:
-          DEV_URL: https://6832-105-113-78-20.ngrok-free.app  # Set this secret to your Ngrok URL
+          DEV_URL: "https://6832-105-113-78-20.ngrok-free.app"  # Notice the quotes
         run: |
           docker run --rm \
-            -v $(pwd)/zap-reports:/zap/wrk:rw \  # Mount writable volume
+            -v $(pwd)/zap-reports:/zap/wrk:rw \
             owasp/zap2docker-stable zap-baseline.py \
-            -t $DEV_URL \
-            -r report.html \
-            -x report.xml \
-            -J report.json \
-            -w report.md
-          
+            -t "$DEV_URL" \  # Quoted variable
+            -r /zap/wrk/report.html \  # Full container paths
+            -x /zap/wrk/report.xml \
+            -J /zap/wrk/report.json \
+            -w /zap/wrk/report.md
+        
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
           name: zap-results
-          path: |
-            zap-report.html
-            report.xml
+          path: zap-reports/*  # Matches the mounted directory
