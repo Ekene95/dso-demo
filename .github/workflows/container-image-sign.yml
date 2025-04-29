@@ -44,6 +44,22 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         continue-on-error: true
 
+      - name: Snyk Container Monitor
+        run: |
+          snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            --project-name="$IMAGE_NAME:$IMAGE_TAG" \
+            --debug \
+            --log-level=trace
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Upload Snyk Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: snyk-results
+          path: snyk_results.json
+
       - name: Fail Build on Snyk Vulnerabilities
         if: steps.snyk_container_scan.outcome == 'failure'
         run: |
