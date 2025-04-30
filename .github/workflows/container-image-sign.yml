@@ -89,139 +89,7 @@ jobs:
       #     cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
 
 
-
-
-
-  #DAST STarts here.
-      # - name: Create workspace
-      #   run: mkdir -p zap-reports
-  
-      # - name: Run ZAP Scan
-      #   env:
-      #     DEV_URL: "https://6832-105-113-78-20.ngrok-free.app"  # Your Ngrok URL
-      #   run: |
-      #     docker run --rm \
-      #       -v $(pwd)/zap-reports:/zap/wrk:rw \
-      #       ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-      #       -t "$DEV_URL" \
-      #       -r /zap/wrk/report.html \
-      #       -x /zap/wrk/report.xml \
-      #       -w /zap/wrk/report.md
-  
-      # - name: Verify reports
-      #   run: |
-      #     ls -la zap-reports/
-      #     [ -f zap-reports/report.html ] || exit 1
-  
-      # - name: Upload results
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: zap-results
-      #     path: zap-reports/*
-
-      # - name: Set up workspace
-      #   run: |
-      #     mkdir -p zap-reports
-      #     chmod -R 777 zap-reports  # Ensure write permissions
-
-      # - name: Run ZAP Scan
-      #   env:
-      #     DEV_URL: "https://03dd-105-113-58-100.ngrok-free.app"
-      #   run: |
-      #     docker run --rm \
-      #       -u $(id -u):$(id -g) \  # Run as current user
-      #       -v $(pwd)/zap-reports:/zap/wrk:rw \
-      #       ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-      #       -t "$DEV_URL" \
-      #       -r report.html \
-      #       -x report.xml \
-      #       -w report.md
-
-      # - name: Verify reports
-      #   run: |
-      #     ls -la zap-reports/
-      #     [ -f zap-reports/report.html ] || exit 1
-
-      # - name: Upload results
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: zap-results
-      #     path: zap-reports/*
-
-      # - name: Minimal ZAP Scan
-      #   run: |
-      #     mkdir -p zap-reports
-      #     docker run --rm \
-      #     -v $(pwd)/zap-reports:/zap/wrk:rw \
-      #     ghcr.io/zaproxy/zaproxy:stable \
-      #     zap-baseline.py \
-      #     -t "https://03dd-105-113-58-100.ngrok-free.app" \
-      #     -r report.html
-
-      # - name: ZAP Full Scan
-      #   uses: zaproxy/action-full-scan@v0.6.0
-      #   with:
-      #     target: 'https://03dd-105-113-58-100.ngrok-free.app'
-      #     rules_file_name: '.zap/zap.conf'  # Optional config file
-      #     cmd_options: '-T 60 -j'  # 60 min timeout + JSON + XML reports
-      #     issue_title: ''  # Empty string disables issue creation
-      #     allow_issue_writing: 'false'  # Explicitly disable issue writing
-          
-      # - name: Rename Reports (fixes artifact upload)
-      #   run: |
-      #     [ -f zap-report.html ] && mv zap-report.html zap-report-$(date +%s).html || echo "No HTML report"
-      #     [ -f zap-report.json ] && mv zap-report.json zap-report-$(date +%s).json || echo "No JSON report"
-      #     [ -f zap-report.xml ] && mv zap-report.xml zap-report-$(date +%s).xml || echo "No XML report"
-  
-      # - name: Upload Reports
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: zap-results  # Simple name without special chars
-      #     path: |
-      #       zap-report-*.html
-      #       zap-report-*.json
-      #       zap-report-*.xml
-
-            # Step 1: Run scan without any automatic artifact handling
-      # - name: Set up workspace
-      #   run: |
-      #     mkdir -p zap-reports
-      #     chmod -R 777 zap-reports
-          
-      # - name: Run ZAP Scan
-      #   run: |
-      #     docker run --rm \
-      #     -u $(id -u):$(id -g) \
-      #     -v $(pwd)/zap-reports:/zap/wrk:rw \
-      #     -w /zap/wrk \
-      #     ghcr.io/zaproxy/zaproxy:stable \
-      #     zap-baseline.py \
-      #     -t "https://03dd-105-113-58-100.ngrok-free.app" \
-      #     -r report.html \
-      #     -x report.xml \
-      #     -w report.md \
-      #     -g zap.yaml  # Specify the output location for zap.yaml (relative to /zap/wrk now)
-  
-      # - name: Verify reports
-      #   run: |
-      #     ls -la zap-reports/
-      #     if [ ! -f zap-reports/report.html ]; then
-      #       echo "::error::HTML report missing"
-      #       exit 1
-      #     fi
-      #     [ -f zap-reports/report.xml ] || echo "::warning::XML report missing (optional)"
-      #     [ -f zap-reports/report.md ] || echo "::warning::MD report missing (optional)"
-      #     [ -f zap-reports/zap.yaml ] || echo "::warning::ZAP config missing (optional)" # Verify zap.yaml
-  
-      # - name: Upload results
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: zap-results
-      #     path: |
-      #       zap-reports/report.html
-      #       zap-reports/report.xml
-      #       zap-reports/report.md
-      #       zap-reports/zap.yaml # Include the zap.yaml in the artifact
+      #DAST STarts here.
 
       - name: ZAP Scan
         run: |
@@ -243,9 +111,10 @@ jobs:
           name: zap-results
           path: zap-reports/report.html
 
+      # Force failure on any non-zero exit code
       - name: Check Results
-        if: steps.zap-scan.outcome == 'failure'
+        if: steps.zap-scan.conclusion != 'success'
         run: |
-          echo "ZAP found security warnings (see report)"
-          echo "View the HTML report in the workflow artifacts"
-          exit 0  # Treat warnings as non-fatal
+          echo "::error::ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
+          echo "Download the report from artifacts to investigate"
+          exit 1  # Explicitly fail the step
