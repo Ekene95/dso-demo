@@ -94,9 +94,8 @@ jobs:
       - name: ZAP Scan
         run: |
           mkdir -p zap-reports
-          sudo chmod 777 zap-reports
           docker run --rm \
-          -u $(id -u):$(id -g) \
+          -u 1000:1000 \ 
           -v $(pwd)/zap-reports:/zap/wrk:rw \
           -w /zap/wrk \
           ghcr.io/zaproxy/zaproxy:stable \
