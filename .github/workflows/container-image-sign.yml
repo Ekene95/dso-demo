@@ -91,29 +91,38 @@ jobs:
 
       #DAST STarts here.
 
-      - name: ZAP Scan
+      - name: Debug Permissions
         run: |
           mkdir -p zap-reports
-          docker run --rm \
-          -u 1000:1000 \ 
-          -v $(pwd)/zap-reports:/zap/wrk:rw \
-          -w /zap/wrk \
-          ghcr.io/zaproxy/zaproxy:stable \
-          zap-baseline.py \
-          -t "https://03dd-105-113-58-100.ngrok-free.app" \
-          -r report.html
-        continue-on-error: true  # Allows workflow to continue despite warnings
+          echo "Directory permissions:"
+          ls -ld zap-reports
+          echo "Container user info:"
+          docker run --rm ghcr.io/zaproxy/zaproxy:stable sh -c "id && ls -ld /zap/wrk"
 
-      - name: Upload Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-results
-          path: zap-reports/report.html
+      # - name: ZAP Scan
+      #   run: |
+      #     mkdir -p zap-reports
+          
+      #     docker run --rm \
+      #     -u 1000:1000 \ 
+      #     -v $(pwd)/zap-reports:/zap/wrk:rw \
+      #     -w /zap/wrk \
+      #     ghcr.io/zaproxy/zaproxy:stable \
+      #     zap-baseline.py \
+      #     -t "https://03dd-105-113-58-100.ngrok-free.app" \
+      #     -r report.html
+      #   continue-on-error: true  # Allows workflow to continue despite warnings
 
-      # Force failure on any non-zero exit code
-      - name: Check Results
-        if: steps.zap-scan.conclusion != 'success'
-        run: |
-          echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
-          echo "Download the report from artifacts to investigate"
-          exit 1  # Explicitly fail the step
+      # - name: Upload Report
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: zap-results
+      #     path: zap-reports/report.html
+
+      # # Force failure on any non-zero exit code
+      # - name: Check Results
+      #   if: steps.zap-scan.conclusion != 'success'
+      #   run: |
+      #     echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
+      #     echo "Download the report from artifacts to investigate"
+      #     exit 1  # Explicitly fail the step
