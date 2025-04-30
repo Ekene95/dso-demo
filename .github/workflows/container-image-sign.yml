@@ -114,31 +114,41 @@ jobs:
       #     name: zap-results
       #     path: zap-reports/*
 
-      - name: Set up workspace
+      # - name: Set up workspace
+      #   run: |
+      #     mkdir -p zap-reports
+      #     chmod -R 777 zap-reports  # Ensure write permissions
+
+      # - name: Run ZAP Scan
+      #   env:
+      #     DEV_URL: "https://03dd-105-113-58-100.ngrok-free.app"
+      #   run: |
+      #     docker run --rm \
+      #       -u $(id -u):$(id -g) \  # Run as current user
+      #       -v $(pwd)/zap-reports:/zap/wrk:rw \
+      #       ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+      #       -t "$DEV_URL" \
+      #       -r report.html \
+      #       -x report.xml \
+      #       -w report.md
+
+      # - name: Verify reports
+      #   run: |
+      #     ls -la zap-reports/
+      #     [ -f zap-reports/report.html ] || exit 1
+
+      # - name: Upload results
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: zap-results
+      #     path: zap-reports/*
+
+      - name: Minimal ZAP Scan
         run: |
           mkdir -p zap-reports
-          chmod -R 777 zap-reports  # Ensure write permissions
-
-      - name: Run ZAP Scan
-        env:
-          DEV_URL: "https://6832-105-113-78-20.ngrok-free.app"
-        run: |
           docker run --rm \
-            -u $(id -u):$(id -g) \  # Run as current user
-            -v $(pwd)/zap-reports:/zap/wrk:rw \
-            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-            -t "$DEV_URL" \
-            -r report.html \
-            -x report.xml \
-            -w report.md
-
-      - name: Verify reports
-        run: |
-          ls -la zap-reports/
-          [ -f zap-reports/report.html ] || exit 1
-
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-results
-          path: zap-reports/*
+          -v $(pwd)/zap-reports:/zap/wrk:rw \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
+          -t "https://03dd-105-113-58-100.ngrok-free.app" \
+          -r report.html
