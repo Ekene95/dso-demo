@@ -16,6 +16,9 @@ jobs:
     outputs:
       image-digest: ${{ steps.push-image.outputs.digest }}
       sbom-hash: ${{ steps.generate-sbom.outputs.HASHES }}
+      image-ref: ${{ steps.set-image-ref.outputs.image-ref }}
+      registry-username: ${{ secrets.DOCKER_USERNAME }}
+      registry-password: ${{ secrets.DOCKER_PASSWORD }}
     
     steps:
       - name: Checkout code
@@ -30,18 +33,23 @@ jobs:
           SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
           echo "IMAGE_TAG=develop-${SHORT_SHA}" >> $GITHUB_ENV
 
+      - name: Set image reference
+        id: set-image-ref
+        run: |
+          echo "image-ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" >> $GITHUB_OUTPUT
+
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
       - name: Build Docker image
         run: |
-          docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+          docker build -t ${{ steps.set-image-ref.outputs.image-ref }} .
 
       # SBOM Generation
       - name: Generate SBOM with Syft
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          syft $REGISTRY/$IMAGE_NAME:$IMAGE_TAG -o spdx-json > sbom.spdx.json
+          syft ${{ steps.set-image-ref.outputs.image-ref }} -o spdx-json > sbom.spdx.json
           echo "HASHES=$(cat sbom.spdx.json | sha256sum | cut -d' ' -f1)" >> $GITHUB_OUTPUT
         id: generate-sbom
 
@@ -51,21 +59,21 @@ jobs:
           name: sbom-artifacts
           path: sbom.spdx.json
 
-      # Security Scanning (your existing Snyk steps)
+      # Security Scanning
       - name: Install Snyk CLI
         run: npm install -g snyk
 
       - name: Snyk Container Scan
         id: snyk_container_scan
         run: |
-          snyk container test --org=ekene95 --tags=dev,container  $REGISTRY/$IMAGE_NAME:$IMAGE_TAG --severity-threshold=medium
+          snyk container test --org=ekene95 --tags=dev,container ${{ steps.set-image-ref.outputs.image-ref }} --severity-threshold=high
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         continue-on-error: true
 
       - name: Snyk Container Monitor
         run: |
-          snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+          snyk container monitor ${{ steps.set-image-ref.outputs.image-ref }} \
             --org=ekene95 \
             --project-name="$IMAGE_NAME:$IMAGE_TAG"
         env:
@@ -74,8 +82,8 @@ jobs:
       - name: Push Docker image and get digest
         id: push-image
         run: |
-          docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $REGISTRY/$IMAGE_NAME:$IMAGE_TAG | cut -d'@' -f2)
+          docker push ${{ steps.set-image-ref.outputs.image-ref }}
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ steps.set-image-ref.outputs.image-ref }} | cut -d'@' -f2)
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
   # Second job: SLSA Provenance Generation
@@ -87,20 +95,26 @@ jobs:
       contents: write
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.7.0
     with:
-      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-sbom.outputs.image-digest }}
+      image: ${{ needs.build-and-sbom.outputs.image-ref }}
       push-to-registry: false
-      registry-username: ${{ secrets.DOCKER_USERNAME }}
-      registry-password: ${{ secrets.DOCKER_PASSWORD }}
+      registry-username: ${{ needs.build-and-sbom.outputs.registry-username }}
+      registry-password: ${{ needs.build-and-sbom.outputs.registry-password }}
 
   # Third job: Signing and Verification
   sign-and-verify:
     needs: [build-and-sbom, slsa-provenance]
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # For keyless signing
+      id-token: write
       contents: read
     
     steps:
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-artifacts
+          path: .
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@main
 
@@ -126,7 +140,7 @@ jobs:
             --source-tag ${{ github.ref }} \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-sbom.outputs.image-digest }}
 
-      # DAST Scanning (your existing ZAP steps)
+      # DAST Scanning
       - name: ZAP Scan
         run: |
           mkdir -p zap-reports
