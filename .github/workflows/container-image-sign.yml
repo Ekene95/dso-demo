@@ -158,11 +158,9 @@ jobs:
         with:
           target: 'https://03dd-105-113-58-100.ngrok-free.app'
           rules_file_name: '.zap/zap.conf'  # Optional config file
-          cmd_options: '-T 60 -j'  # Timeout + JSON + XML
-          create_issue: 'false'
-          issue_title: ''  # Empty string fully disables issue creation
-          upload_results: 'true'
-          artifact_name: 'zap-results'
+          cmd_options: '-T 60 -j -x'  # 60 min timeout + JSON + XML reports
+          issue_title: ''  # Empty string disables issue creation
+          allow_issue_writing: 'false'  # Explicitly disable issue writing
           
       - name: Upload Report
         uses: actions/upload-artifact@v4
