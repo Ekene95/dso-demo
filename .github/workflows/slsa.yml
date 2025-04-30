@@ -1,0 +1,148 @@
+name: Build, Image Scan, Sign, Push Docker Image, Deploy and Scan post deployment (develop only)
+
+on:
+  push:
+    branches:
+      - develop
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: kenzman/provenance
+
+jobs:
+  build-sign-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write # Needed for keyless signing
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Set up image tag (develop-SHORT_SHA)
+        id: versioning
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "IMAGE_TAG=develop-${SHORT_SHA}" >> $GITHUB_ENV
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: |
+          docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+
+      # SBOM Generation
+      - name: Generate SBOM with Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          syft $REGISTRY/$IMAGE_NAME:$IMAGE_TAG -o spdx-json > sbom.spdx.json
+          syft $REGISTRY/$IMAGE_NAME:$IMAGE_TAG -o cyclonedx-json > sbom.cyclonedx.json
+          echo "HASHES=$(cat sbom.spdx.json | sha256sum | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+        id: generate-sbom
+
+      - name: Upload SBOM as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-artifacts
+          path: |
+            sbom.spdx.json
+            sbom.cyclonedx.json
+
+      # Security Scanning
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Snyk Container Scan
+        id: snyk_container_scan
+        run: |
+          snyk container test --org=ekene95 --tags=dev,container  $REGISTRY/$IMAGE_NAME:$IMAGE_TAG --severity-threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+
+      - name: Snyk Container Monitor
+        run: |
+          snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            --org=ekene95 \
+            --project-name="$IMAGE_NAME:$IMAGE_TAG"
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Upload Snyk Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snyk-results
+          path: snyk_results.json
+
+      - name: Fail Build on Snyk Vulnerabilities
+        if: steps.snyk_container_scan.outcome == 'failure'
+        run: |
+          echo "Snyk found vulnerabilities in the container image!"
+          exit 1
+
+      # Provenance Generation
+      - name: Generate container provenance
+        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.7.0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          push-to-registry: true
+          registry-username: ${{ secrets.DOCKER_USERNAME }}
+          registry-password: ${{ secrets.DOCKER_PASSWORD }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate SBOM provenance
+        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.7.0
+        with:
+          base64-subjects: "${{ steps.generate-sbom.outputs.HASHES }}"
+          provenance-name: "sbom.intoto.jsonl"
+          upload-assets: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Push and Sign
+      - name: Push Docker image and get digest
+        run: |
+          docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $REGISTRY/$IMAGE_NAME:$IMAGE_TAG | cut -d'@' -f2)
+          echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
+
+      - name: Sign container image with Cosign
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        run: |
+          cosign sign $REGISTRY/$IMAGE_NAME@$DIGEST
+
+      - name: Attach SBOM to image
+        run: |
+          cosign attach sbom --sbom sbom.spdx.json $REGISTRY/$IMAGE_NAME@$DIGEST
+
+      - name: Sign SBOM attestation
+        run: |
+          cosign attest --predicate sbom.spdx.json --type spdxjson $REGISTRY/$IMAGE_NAME@$DIGEST
+
+      # Verification
+      - name: Verify SLSA provenance
+        run: |
+          slsa-verifier verify-artifact \
+            --provenance-path container.intoto.jsonl \
+            --source-uri github.com/${{ github.repository }} \
+            --source-tag ${{ github.ref }} \
+            $REGISTRY/$IMAGE_NAME@$DIGEST
+
+      - name: Verify SBOM attestation
+        run: |
+          cosign verify-attestation \
+            --type spdxjson \
+            $REGISTRY/$IMAGE_NAME@$DIGEST
+
+      # DAST Scanning (unchanged)
+#      - name: ZAP Scan
+        # ... (your existing ZAP scan steps)
