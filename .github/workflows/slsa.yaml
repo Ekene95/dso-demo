@@ -16,6 +16,8 @@ jobs:
       image-digest: ${{ steps.push-image.outputs.digest }}
       sbom-hash: ${{ steps.generate-sbom.outputs.HASHES }}
       image-ref: ${{ steps.set-image-ref.outputs.image-ref }}
+      docker-username: ${{ secrets.DOCKER_USERNAME }}
+      docker-password: ${{ secrets.DOCKER_PASSWORD }}
     
     steps:
       - name: Checkout code
@@ -95,8 +97,8 @@ jobs:
     with:
       image: ${{ needs.build-and-sbom.outputs.image-ref }}
       digest: ${{ needs.build-and-sbom.outputs.image-digest }}
-      registry-username: ${{ secrets.DOCKER_USERNAME }}
-      registry-password: ${{ secrets.DOCKER_PASSWORD }}
+      registry-username: ${{ needs.build-and-sbom.outputs.docker-username }}
+      registry-password: ${{ needs.build-and-sbom.outputs.docker-password }}
       push-to-registry: false
 
   sign-and-verify:
