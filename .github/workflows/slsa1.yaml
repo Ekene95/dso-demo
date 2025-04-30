@@ -10,7 +10,6 @@ env:
   IMAGE_NAME: kenzman/provenance
 
 jobs:
-  # First job: Build and generate SBOM
   build-and-sbom:
     runs-on: ubuntu-latest
     outputs:
@@ -20,10 +19,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Set up image tag (develop-SHORT_SHA)
         id: versioning
@@ -37,13 +36,15 @@ jobs:
           echo "image-ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" >> $GITHUB_OUTPUT
 
       - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker image
         run: |
           docker build -t ${{ steps.set-image-ref.outputs.image-ref }} .
 
-      # SBOM Generation
       - name: Generate SBOM with Syft
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
@@ -57,14 +58,13 @@ jobs:
           name: sbom-artifacts
           path: sbom.spdx.json
 
-      # Security Scanning
       - name: Install Snyk CLI
         run: npm install -g snyk
 
       - name: Snyk Container Scan
         id: snyk_container_scan
         run: |
-          snyk container test --org=ekene95 --tags=dev,container ${{ steps.set-image-ref.outputs.image-ref }} --severity-threshold=high
+          snyk container test --org=ekene95 --tags=dev,container ${{ steps.set-image-ref.outputs.image-ref }} --severity-threshold=medium
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         continue-on-error: true
@@ -84,21 +84,21 @@ jobs:
           DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ steps.set-image-ref.outputs.image-ref }} | cut -d'@' -f2)
           echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
 
-  # Second job: SLSA Provenance Generation
   slsa-provenance:
     needs: build-and-sbom
     permissions:
       actions: read
       id-token: write
       contents: write
-      packages: none # Explicitly set to none to match requirements
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.7.0
+      packages: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
-      base64-subjects: "${{ needs.build-and-sbom.outputs.image-digest }}"
-      provenance-name: "container.intoto.jsonl"
-      upload-assets: true
+      image: ${{ needs.build-and-sbom.outputs.image-ref }}
+      digest: ${{ needs.build-and-sbom.outputs.image-digest }}
+      registry-username: ${{ secrets.DOCKER_USERNAME }}
+      registry-password: ${{ secrets.DOCKER_PASSWORD }}
+      push-to-registry: false
 
-  # Third job: Signing and Verification
   sign-and-verify:
     needs: [build-and-sbom, slsa-provenance]
     runs-on: ubuntu-latest
@@ -138,7 +138,6 @@ jobs:
             --source-tag ${{ github.ref }} \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-sbom.outputs.image-digest }}
 
-      # DAST Scanning
       - name: ZAP Scan
         run: |
           mkdir -p zap-reports
