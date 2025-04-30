@@ -162,8 +162,17 @@ jobs:
           issue_title: ''  # Empty string disables issue creation
           allow_issue_writing: 'false'  # Explicitly disable issue writing
           
-      - name: Upload Report
+      - name: Rename Reports (fixes artifact upload)
+        run: |
+          [ -f zap-report.html ] && mv zap-report.html zap-report-$(date +%s).html || echo "No HTML report"
+          [ -f zap-report.json ] && mv zap-report.json zap-report-$(date +%s).json || echo "No JSON report"
+          [ -f zap-report.xml ] && mv zap-report.xml zap-report-$(date +%s).xml || echo "No XML report"
+  
+      - name: Upload Reports
         uses: actions/upload-artifact@v4
         with:
-          name: zap-scan-results
-          path: zap-report.html
+          name: zap-results  # Simple name without special chars
+          path: |
+            zap-report-*.html
+            zap-report-*.json
+            zap-report-*.xml
