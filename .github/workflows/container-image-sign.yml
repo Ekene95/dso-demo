@@ -130,20 +130,12 @@ jobs:
       - name: ZAP Scan
         run: |
           mkdir -p zap-reports
-          sudo chown -R 1000:1000 zap-reports  # Match ZAP's user
-          sudo chmod -R 777 zap-reports        # Temporary full access
-          echo "--- Host Directory Info ---"
-          ls -ld zap-reports
-          stat -c "%U:%G %a" zap-reports
+          chmod -R 777 zap-reports
           docker run --rm \
-            -u 1000:1000 \  # Explicitly use ZAP's user
-            -v $(pwd)/zap-reports:/zap/wrk:rw \
+            -u root:root \
+            -v "$(pwd)/zap-reports:/zap/wrk:rw" \
             -w /zap/wrk \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t "https://03dd-105-113-58-100.ngrok-free.app" \
-            -r report.html \
-            -x report.xml
-          echo "--- Generated Reports ---"
-          ls -l zap-reports/
-        continue-on-error: true
+            -r report.html
