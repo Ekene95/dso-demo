@@ -178,14 +178,29 @@ jobs:
       #       zap-report-*.xml
 
             # Step 1: Run scan without any automatic artifact handling
-      - name: ZAP Scan
-        uses: zaproxy/action-baseline@v0.5.0  # Simpler baseline scan
+      - name: ZAP Full Scan
+        id: zap-scan
+        uses: zaproxy/action-full-scan@v0.6.0
         with:
           target: 'https://03dd-105-113-58-100.ngrok-free.app'
-          cmd_options: '-r report.html'
+          cmd_options: '-T 60 -j -r zap-report.html -J zap-report.json -x zap-report.xml'
+          allow_issue_writing: 'false'
+          issue_title: ''
               
-      - name: Upload
+          # Step 2: Verify files were created
+      - name: Check Report Files
+        run: |
+          ls -la
+          [ -f zap-report.html ] || exit 1
+          [ -f zap-report.json ] || echo "JSON report missing (optional)"
+          [ -f zap-report.xml ] || echo "XML report missing (optional)"
+              
+          # Step 3: Manual artifact upload
+      - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
-          name: zap-report
-          path: report.html
+          name: zap-security-results
+          path: |
+            zap-report.html
+            zap-report.json
+            zap-report.xml
