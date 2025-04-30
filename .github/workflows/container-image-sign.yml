@@ -96,7 +96,7 @@ jobs:
           mkdir -p zap-reports
           sudo chmod 777 zap-reports
           docker run --rm \
-          -u root:root \
+          -u $(id -u):$(id -g) \
           -v $(pwd)/zap-reports:/zap/wrk:rw \
           -w /zap/wrk \
           ghcr.io/zaproxy/zaproxy:stable \
@@ -115,6 +115,6 @@ jobs:
       - name: Check Results
         if: steps.zap-scan.conclusion != 'success'
         run: |
-          echo "::error::ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
+          echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
           echo "Download the report from artifacts to investigate"
           exit 1  # Explicitly fail the step
