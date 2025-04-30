@@ -235,7 +235,6 @@ jobs:
           zap-baseline.py \
           -t "https://03dd-105-113-58-100.ngrok-free.app" \
           -r report.html
-          -I  # Ignore warning exit code
         continue-on-error: true  # Allows workflow to continue despite warnings
 
       - name: Upload Report
