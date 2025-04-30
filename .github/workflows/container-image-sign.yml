@@ -161,14 +161,15 @@ jobs:
       - name: Run ZAP Scan
         run: |
           docker run --rm \
-            -u $(id -u):$(id -g) \
-            -v $(pwd)/zap-reports:/zap/wrk:rw \
-            ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py \
-            -t "https://03dd-105-113-58-100.ngrok-free.app" \
-            -r /zap/wrk/report.html \
-            -x /zap/wrk/report.xml \
-            -w /zap/wrk/report.md
+          -u $(id -u):$(id -g) \
+          -v $(pwd)/zap-reports:/zap/wrk:rw \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
+          -t "https://03dd-105-113-58-100.ngrok-free.app" \
+          -r /zap/wrk/report.html \
+          -x /zap/wrk/report.xml \
+          -w /zap/wrk/report.md \
+          -g /zap/wrk/zap.yaml  # Specify the output location for zap.yaml
 
       - name: Verify reports
         run: |
