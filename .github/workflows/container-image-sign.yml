@@ -153,26 +153,54 @@ jobs:
       #     -t "https://03dd-105-113-58-100.ngrok-free.app" \
       #     -r report.html
 
+      # - name: ZAP Full Scan
+      #   uses: zaproxy/action-full-scan@v0.6.0
+      #   with:
+      #     target: 'https://03dd-105-113-58-100.ngrok-free.app'
+      #     rules_file_name: '.zap/zap.conf'  # Optional config file
+      #     cmd_options: '-T 60 -j'  # 60 min timeout + JSON + XML reports
+      #     issue_title: ''  # Empty string disables issue creation
+      #     allow_issue_writing: 'false'  # Explicitly disable issue writing
+          
+      # - name: Rename Reports (fixes artifact upload)
+      #   run: |
+      #     [ -f zap-report.html ] && mv zap-report.html zap-report-$(date +%s).html || echo "No HTML report"
+      #     [ -f zap-report.json ] && mv zap-report.json zap-report-$(date +%s).json || echo "No JSON report"
+      #     [ -f zap-report.xml ] && mv zap-report.xml zap-report-$(date +%s).xml || echo "No XML report"
+  
+      # - name: Upload Reports
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: zap-results  # Simple name without special chars
+      #     path: |
+      #       zap-report-*.html
+      #       zap-report-*.json
+      #       zap-report-*.xml
+
+            # Step 1: Run scan without any automatic artifact handling
       - name: ZAP Full Scan
+        id: zap-scan
         uses: zaproxy/action-full-scan@v0.6.0
         with:
           target: 'https://03dd-105-113-58-100.ngrok-free.app'
-          rules_file_name: '.zap/zap.conf'  # Optional config file
-          cmd_options: '-T 60 -j'  # 60 min timeout + JSON + XML reports
-          issue_title: ''  # Empty string disables issue creation
-          allow_issue_writing: 'false'  # Explicitly disable issue writing
-          
-      - name: Rename Reports (fixes artifact upload)
+          cmd_options: '-T 60 -j -x -r zap-report.html -J zap-report.json -x zap-report.xml'
+          allow_issue_writing: 'false'
+          issue_title: ''
+              
+          # Step 2: Verify files were created
+      - name: Check Report Files
         run: |
-          [ -f zap-report.html ] && mv zap-report.html zap-report-$(date +%s).html || echo "No HTML report"
-          [ -f zap-report.json ] && mv zap-report.json zap-report-$(date +%s).json || echo "No JSON report"
-          [ -f zap-report.xml ] && mv zap-report.xml zap-report-$(date +%s).xml || echo "No XML report"
-  
-      - name: Upload Reports
+          ls -la
+          [ -f zap-report.html ] || exit 1
+          [ -f zap-report.json ] || echo "JSON report missing (optional)"
+          [ -f zap-report.xml ] || echo "XML report missing (optional)"
+              
+          # Step 3: Manual artifact upload
+      - name: Upload Security Report
         uses: actions/upload-artifact@v4
         with:
-          name: zap-results  # Simple name without special chars
+          name: zap-security-results
           path: |
-            zap-report-*.html
-            zap-report-*.json
-            zap-report-*.xml
+            zap-report.html
+            zap-report.json
+            zap-report.xml
