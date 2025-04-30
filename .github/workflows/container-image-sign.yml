@@ -178,42 +178,59 @@ jobs:
       #       zap-report-*.xml
 
             # Step 1: Run scan without any automatic artifact handling
-      - name: Set up workspace
-        run: |
-          mkdir -p zap-reports
-          chmod -R 777 zap-reports
+      # - name: Set up workspace
+      #   run: |
+      #     mkdir -p zap-reports
+      #     chmod -R 777 zap-reports
           
-      - name: Run ZAP Scan
-        run: |
-          docker run --rm \
-          -u $(id -u):$(id -g) \
-          -v $(pwd)/zap-reports:/zap/wrk:rw \
-          -w /zap/wrk \
-          ghcr.io/zaproxy/zaproxy:stable \
-          zap-baseline.py \
-          -t "https://03dd-105-113-58-100.ngrok-free.app" \
-          -r report.html \
-          -x report.xml \
-          -w report.md \
-          -g zap.yaml  # Specify the output location for zap.yaml (relative to /zap/wrk now)
+      # - name: Run ZAP Scan
+      #   run: |
+      #     docker run --rm \
+      #     -u $(id -u):$(id -g) \
+      #     -v $(pwd)/zap-reports:/zap/wrk:rw \
+      #     -w /zap/wrk \
+      #     ghcr.io/zaproxy/zaproxy:stable \
+      #     zap-baseline.py \
+      #     -t "https://03dd-105-113-58-100.ngrok-free.app" \
+      #     -r report.html \
+      #     -x report.xml \
+      #     -w report.md \
+      #     -g zap.yaml  # Specify the output location for zap.yaml (relative to /zap/wrk now)
   
-      - name: Verify reports
-        run: |
-          ls -la zap-reports/
-          if [ ! -f zap-reports/report.html ]; then
-            echo "::error::HTML report missing"
-            exit 1
-          fi
-          [ -f zap-reports/report.xml ] || echo "::warning::XML report missing (optional)"
-          [ -f zap-reports/report.md ] || echo "::warning::MD report missing (optional)"
-          [ -f zap-reports/zap.yaml ] || echo "::warning::ZAP config missing (optional)" # Verify zap.yaml
+      # - name: Verify reports
+      #   run: |
+      #     ls -la zap-reports/
+      #     if [ ! -f zap-reports/report.html ]; then
+      #       echo "::error::HTML report missing"
+      #       exit 1
+      #     fi
+      #     [ -f zap-reports/report.xml ] || echo "::warning::XML report missing (optional)"
+      #     [ -f zap-reports/report.md ] || echo "::warning::MD report missing (optional)"
+      #     [ -f zap-reports/zap.yaml ] || echo "::warning::ZAP config missing (optional)" # Verify zap.yaml
   
-      - name: Upload results
+      # - name: Upload results
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: zap-results
+      #     path: |
+      #       zap-reports/report.html
+      #       zap-reports/report.xml
+      #       zap-reports/report.md
+      #       zap-reports/zap.yaml # Include the zap.yaml in the artifact
+
+      - name: ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.6.0
+        with:
+          target: 'https://03dd-105-113-58-100.ngrok-free.app'
+          cmd_options: '-r /zap/wrk/report.html -x /zap/wrk/report.xml -J /zap/wrk/report.json'
+          docker_options: '-u root:root -w /zap/wrk'
+          allow_issue_writing: 'false'  # Disable GitHub issues if not needed
+
+      - name: Upload Reports
         uses: actions/upload-artifact@v4
         with:
           name: zap-results
           path: |
-            zap-reports/report.html
-            zap-reports/report.xml
-            zap-reports/report.md
-            zap-reports/zap.yaml # Include the zap.yaml in the artifact
+            zap-report.html  # The action moves files here automatically
+            zap-report.xml
+            zap-report.json
