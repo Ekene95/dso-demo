@@ -142,7 +142,3 @@ jobs:
           cosign verify-attestation \
             --type spdxjson \
             $REGISTRY/$IMAGE_NAME@$DIGEST
-
-      # DAST Scanning (unchanged)
-#      - name: ZAP Scan
-        # ... (your existing ZAP scan steps)
