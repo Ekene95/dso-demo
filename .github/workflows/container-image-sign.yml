@@ -159,7 +159,8 @@ jobs:
           target: 'https://03dd-105-113-58-100.ngrok-free.app'
           rules_file_name: '.zap/zap.conf'  # Optional config file
           cmd_options: '-T 60 -j'  # Timeout + JSON + XML
-          create_issue: 'false'  #fix
+          create_issue: 'false'
+          issue_title: ''  # Empty string fully disables issue creation
           upload_results: 'true'
           artifact_name: 'zap-results'
           
