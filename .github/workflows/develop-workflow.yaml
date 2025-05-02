@@ -33,39 +33,39 @@ jobs:
         run: |
           docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
 
-    # # Container security starts here
+    # Container security starts here
 
-    #   - name: Install Snyk CLI
-    #     run: npm install -g snyk
+      - name: Install Snyk CLI
+        run: npm install -g snyk
 
-    #   - name: Snyk Container Scan
-    #     id: snyk_container_scan
-    #     run: |
-    #       snyk container test --org=ekene95 --tags=dev,container  $REGISTRY/$IMAGE_NAME:$IMAGE_TAG --severity-threshold=high
-    #     env:
-    #       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-    #     continue-on-error: true
+      - name: Snyk Container Scan
+        id: snyk_container_scan
+        run: |
+          snyk container test --org=ekene95 --tags=dev,container  $REGISTRY/$IMAGE_NAME:$IMAGE_TAG --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
 
-    #   - name: Snyk Container Monitor
-    #     run: |
-    #       snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
-    #         --org=ekene95 \
-    #         --project-name="$IMAGE_NAME:$IMAGE_TAG"
-    #     env:
-    #       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Snyk Container Monitor
+        run: |
+          snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            --org=ekene95 \
+            --project-name="$IMAGE_NAME:$IMAGE_TAG"
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-    #   - name: Upload Snyk Results
-    #     uses: actions/upload-artifact@v4
-    #     if: always()
-    #     with:
-    #       name: snyk-results
-    #       path: snyk_results.json
+      - name: Upload Snyk Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snyk-results
+          path: snyk_results.json
 
-    #   - name: Fail Build on Snyk Vulnerabilities
-    #     if: steps.snyk_container_scan.outcome == 'failure'
-    #     run: |
-    #       echo "Snyk found vulnerabilities in the container image!"
-    #       exit 1
+      - name: Fail Build on Snyk Vulnerabilities
+        if: steps.snyk_container_scan.outcome == 'failure'
+        run: |
+          echo "Snyk found vulnerabilities in the container image!"
+          exit 1
 
       
       #Software provenance starts here
