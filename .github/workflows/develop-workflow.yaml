@@ -1,0 +1,123 @@
+name: Build, Image Scan, Sign, Push Docker Image, Deploy and Scan post deployment (develop only)
+
+on:
+  push:
+    branches:
+#      - develop
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: kenzman/provenance
+
+jobs:
+  build-sign-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Set up image tag (develop-SHORT_SHA)
+        id: versioning
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "IMAGE_TAG=develop-${SHORT_SHA}" >> $GITHUB_ENV
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: |
+          docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+
+    # Container security starts here
+
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Snyk Container Scan
+        id: snyk_container_scan
+        run: |
+          snyk container test --org=ekene95 --tags=dev,container  $REGISTRY/$IMAGE_NAME:$IMAGE_TAG --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+
+      - name: Snyk Container Monitor
+        run: |
+          snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            --org=ekene95 \
+            --project-name="$IMAGE_NAME:$IMAGE_TAG"
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Upload Snyk Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snyk-results
+          path: snyk_results.json
+
+      - name: Fail Build on Snyk Vulnerabilities
+        if: steps.snyk_container_scan.outcome == 'failure'
+        run: |
+          echo "Snyk found vulnerabilities in the container image!"
+          exit 1
+
+      
+      #Software provenance starts here
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@main
+
+      - name: Push Docker image and get digest
+        run: |
+          docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+          # Extract digest (format: sha256:abc123...)
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $REGISTRY/$IMAGE_NAME:$IMAGE_TAG | cut -d'@' -f2)
+          echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
+
+      - name: Sign with Cosign (Digest-Based)
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+        run: |
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
+
+      - name: Verify Signature
+        env:
+          COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+        run: |
+          cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
+
+      #DAST STarts here.
+
+      - name: ZAP Scan
+        run: |
+          mkdir -p zap-reports
+          
+          docker run --rm \
+          -u 1000:1000 \ 
+          -v $(pwd)/zap-reports:/zap/wrk:rw \
+          -w /zap/wrk \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
+          -t "https://03dd-105-113-58-100.ngrok-free.app" \
+          -r report.html
+        continue-on-error: true  # Allows workflow to continue despite warnings
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-results
+          path: zap-reports/report.html
+
+      # Force failure on any non-zero exit code
+      - name: Check Results
+        if: steps.zap-scan.conclusion != 'success'
+        run: |
+          echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
+          echo "Download the report from artifacts to investigate"
+          exit 1  # Explicitly fail the step
