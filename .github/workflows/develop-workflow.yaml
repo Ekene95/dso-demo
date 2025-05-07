@@ -140,7 +140,7 @@ jobs:
         with:
           target: 'https://03dd-105-113-58-100.ngrok-free.app/api/v1/users'
           cmd_options: '-z "-config api.addheaders=true -config api.key=${ZAP_API_KEY}"'
-          create_issue: false  # Disable GitHub issues
+          #create_issue: false  # Disable GitHub issues
           report_html: true
           report_md: true
           report_json: true
