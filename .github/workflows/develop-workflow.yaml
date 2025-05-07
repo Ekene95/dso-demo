@@ -118,7 +118,7 @@ jobs:
         uses: zaproxy/action-full-scan@v0.6.0
         with:
           target: 'https://03dd-105-113-58-100.ngrok-free.app'
-          cmd_options: '-config api.addheaders=true -config api.key=KJH098765GSKHSA7jgf222'
+          cmd_options: '-config=api.addheaders=true -config=api.key=KJH098765GSKHSA7jgf222'
           rules_file_name: '.zap/rules.tsv'
           report_html: true
           report_md: true
