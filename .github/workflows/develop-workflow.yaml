@@ -156,3 +156,11 @@ jobs:
             report_html.html
             report_md.md
             report_json.json
+
+        # Force failure on any non-zero exit code
+      - name: Check Results
+        if: steps.zap-scan.conclusion != 'success'
+        run: |
+          echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
+          echo "Download the report from artifacts to investigate"
+          exit 1  # Explicitly fail the step
