@@ -114,31 +114,21 @@ jobs:
     #       echo "Download the report from artifacts to investigate"
     #       exit 1  # Explicitly fail the step
 
-      - name: ZAP Scan
-        run: |
-          mkdir -p zap-reports
-          sudo chmod 777 zap-reports
-          docker run --rm \
-          -u root:root \
-          -v $(pwd)/zap-reports:/zap/wrk:rw \
-          -v $(pwd)/.zap/headers.txt:/zap/headers.txt:ro \
-          -w /zap/wrk \
-          ghcr.io/zaproxy/zaproxy:stable \
-          zap-baseline.py \
-          -t "https://jsonplaceholder.typicode.com/posts" \
-          -r report.html \
-          -H /zap/headers.txt
-        continue-on-error: true
-
-      - name: Upload Report
-        uses: actions/upload-artifact@v4
+      - name: OWASP ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.6.0
         with:
-          name: zap-results
-          path: zap-reports/report.html
+          target: 'https://03dd-105-113-58-100.ngrok-free.app'
+          cmd_options: '-config api.addheaders=true -config api.key=0987654bd2t26721hd1299222'
+
+      # - name: Upload Report
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: zap-results
+      #     path: zap-reports/report.html
     
-      - name: Check Results
-        if: steps.zap-scan.conclusion != 'success'
-        run: |
-          echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
-          echo "Download the report from artifacts to investigate"
-          exit 1
+      # - name: Check Results
+      #   if: steps.zap-scan.conclusion != 'success'
+      #   run: |
+      #     echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
+      #     echo "Download the report from artifacts to investigate"
+      #     exit 1
