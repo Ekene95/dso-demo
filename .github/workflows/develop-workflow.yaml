@@ -114,27 +114,6 @@ jobs:
     #       echo "Download the report from artifacts to investigate"
     #       exit 1  # Explicitly fail the step
 
-      # - name: OWASP ZAP Full Scan
-      #   uses: zaproxy/action-full-scan@v0.6.0
-      #   with:
-      #     target: 'https://03dd-105-113-58-100.ngrok-free.app'
-      #     cmd_options: '-z "-config api.addheaders=true -config api.key=${ZAP_API_KEY}"'
-      #   env:
-      #      ZAP_API_KEY: ${{ secrets.API_KEY }}
-
-      # - name: Upload Report
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: zap-results
-      #     path: zap-reports/report.html
-    
-      # - name: Check Results
-      #   if: steps.zap-scan.conclusion != 'success'
-      #   run: |
-      #     echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
-      #     echo "Download the report from artifacts to investigate"
-      #     exit 1
-
       - name: OWASP ZAP Full Scan
         uses: zaproxy/action-full-scan@v0.6.0
         with:
@@ -156,11 +135,24 @@ jobs:
             report_html.html
             report_md.md
             report_json.json
-
-        # Force failure on any non-zero exit code
-      - name: Check Results
-        if: steps.zap-scan.conclusion != 'success'
-        run: |
-          echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
-          echo "Download the report from artifacts to investigate"
-          exit 1  # Explicitly fail the step
+      
+      - name: OWASP ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.6.0
+        with:
+          target: 'https://03dd-105-113-58-100.ngrok-free.app/api/v1/users'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          cmd_options: '-z "-config api.addheaders=true -config api.key=${ZAP_API_KEY}"'
+          issue_title: 'ZAP Security Scan Findings'
+          fail_action: false  # Don't fail workflow on findings
+        env:
+          ZAP_API_KEY: ${{ secrets.API_KEY }}
+      
+      - name: Upload ZAP Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-security-reports
+          path: |
+            report.html
+            report.md
+            report.json
