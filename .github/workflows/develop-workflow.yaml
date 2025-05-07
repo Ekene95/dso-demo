@@ -134,3 +134,25 @@ jobs:
       #     echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
       #     echo "Download the report from artifacts to investigate"
       #     exit 1
+
+      - name: OWASP ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.6.0
+        with:
+          target: 'https://03dd-105-113-58-100.ngrok-free.app/api/v1/users'
+          cmd_options: '-z "-config api.addheaders=true -config api.key=${ZAP_API_KEY}"'
+          create_issue: false  # Disable GitHub issues
+          report_html: true
+          report_md: true
+          report_json: true
+        env:
+          ZAP_API_KEY: ${{ secrets.API_KEY }}
+
+      - name: Upload ZAP Reports
+        if: always()  # Upload even if scan fails
+        uses: actions/upload-artifact@v3
+        with:
+          name: zap-reports
+          path: |
+            report_html.html
+            report_md.md
+            report_json.json

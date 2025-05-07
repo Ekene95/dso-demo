@@ -1,2 +1,5 @@
 10015    WARN    # Incomplete or no cache-control and pragma HTTP header
 90022    WARN    # Missing Anti-CSRF token
+10035	IGNORE	# HSTS
+10038	IGNORE	# CSP
+10063	IGNORE	# Permissions Policy
