@@ -52,9 +52,9 @@ jobs:
             SNYK_MONITOR_OUTPUT=$(snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
             --org=ekene95 \
             --project-name="$IMAGE_NAME:$IMAGE_TAG")
-            echo "$SNYK_MONITOR_OUTPUT"
-            SNYK_LINK=$(echo "$SNYK_MONITOR_OUTPUT" | grep -o 'https://app.snyk.io/org/[^[:space:]]*')
-            echo "SNYK_MONITOR_URL=$SNYK_LINK" >> $GITHUB_OUTPUT
+            ALL_SNYK_LINKS=$(echo "$SNYK_MONITOR_OUTPUT" | grep -o 'https://app.snyk.io/org/[^[:space:]]*')
+            FIRST_SNYK_LINK=$(echo "$ALL_SNYK_LINKS" | head -n 1)
+            echo "SNYK_MONITOR_URL=$FIRST_SNYK_LINK" >> $GITHUB_OUTPUT
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
