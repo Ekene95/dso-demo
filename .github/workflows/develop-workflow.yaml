@@ -62,7 +62,6 @@ jobs:
         if: steps.snyk_container_scan.outcome == 'failure'
         run: |
           echo "Snyk found vulnerabilities in the container image!"
-          # Retrieve the Snyk monitor URL from the previous step's output
           SNYK_MONITOR_URL="${{ steps.snyk_monitor_result.outputs.SNYK_MONITOR_URL }}"
           
           if [ -n "$SNYK_MONITOR_URL" ]; then
