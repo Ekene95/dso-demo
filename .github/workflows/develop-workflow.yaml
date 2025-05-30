@@ -52,15 +52,8 @@ jobs:
             SNYK_MONITOR_OUTPUT=$(snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
             --org=ekene95 \
             --project-name="$IMAGE_NAME:$IMAGE_TAG")
-          
             echo "$SNYK_MONITOR_OUTPUT"
-          
-          # Extract the Snyk project URL from the output.
-          # Snyk monitor output typically includes a link like "https://app.snyk.io/org/<org_id>/project/<project_id>"
-          # This regex looks for a URL starting with https://app.snyk.io/org/ and captures until a space or end of line.
             SNYK_LINK=$(echo "$SNYK_MONITOR_OUTPUT" | grep -o 'https://app.snyk.io/org/[^[:space:]]*')
-          
-          # Store the extracted link as a step output
             echo "SNYK_MONITOR_URL=$SNYK_LINK" >> $GITHUB_OUTPUT
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
