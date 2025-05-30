@@ -33,126 +33,93 @@ jobs:
         run: |
           docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
 
-    # # Container security starts here
+    # Container security starts here
 
-    #   - name: Install Snyk CLI
-    #     run: npm install -g snyk
+      - name: Install Snyk CLI
+        run: npm install -g snyk
 
-    #   - name: Snyk Container Scan
-    #     id: snyk_container_scan
-    #     run: |
-    #       snyk container test --org=ekene95 --tags=dev,container  $REGISTRY/$IMAGE_NAME:$IMAGE_TAG --severity-threshold=medium
-    #     env:
-    #       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-    #     continue-on-error: true
+      - name: Snyk Container Scan
+        id: snyk_container_scan
+        run: |
+          snyk container test --org=ekene95 --tags=dev,container  $REGISTRY/$IMAGE_NAME:$IMAGE_TAG --severity-threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
 
-    #   - name: Snyk Container Monitor
-    #     run: |
-    #       snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
-    #         --org=ekene95 \
-    #         --project-name="$IMAGE_NAME:$IMAGE_TAG"
-    #     env:
-    #       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Snyk Container Monitor
+        id: snyk_monitor_result
+        run: |
+            SNYK_MONITOR_OUTPUT=$(snyk container monitor $REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            --org=ekene95 \
+            --project-name="$IMAGE_NAME:$IMAGE_TAG")
+          
+            echo "$SNYK_MONITOR_OUTPUT"
+          
+          # Extract the Snyk project URL from the output.
+          # Snyk monitor output typically includes a link like "https://app.snyk.io/org/<org_id>/project/<project_id>"
+          # This regex looks for a URL starting with https://app.snyk.io/org/ and captures until a space or end of line.
+            SNYK_LINK=$(echo "$SNYK_MONITOR_OUTPUT" | grep -o 'https://app.snyk.io/org/[^[:space:]]*')
+          
+          # Store the extracted link as a step output
+            echo "SNYK_MONITOR_URL=$SNYK_LINK" >> $GITHUB_OUTPUT
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-    #   - name: Fail Build on Snyk Vulnerabilities
-    #     if: steps.snyk_container_scan.outcome == 'failure'
-    #     run: |
-    #       echo "Snyk found vulnerabilities in the container image!"
-    #       exit 1
+      - name: Fail Build on Snyk Vulnerabilities
+        if: steps.snyk_container_scan.outcome == 'failure'
+        run: |
+          echo "Snyk found vulnerabilities in the container image!"
+          # Retrieve the Snyk monitor URL from the previous step's output
+          SNYK_MONITOR_URL="${{ steps.snyk_monitor_result.outputs.SNYK_MONITOR_URL }}"
+          
+          if [ -n "$SNYK_MONITOR_URL" ]; then
+            echo "For more details, please visit the Snyk project: $SNYK_MONITOR_URL"
+          else
+            echo "Snyk monitor link could not be retrieved. Please check the 'Snyk Container Monitor' step logs."
+          fi
+          exit 1
       
-    #   #Software provenance starts here
-    #   - name: Install Cosign
-    #     uses: sigstore/cosign-installer@main
+      #Software provenance starts here
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@main
 
-    #   - name: Push Docker image and get digest
-    #     run: |
-    #       docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
-    #       # Extract digest (format: sha256:abc123...)
-    #       DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $REGISTRY/$IMAGE_NAME:$IMAGE_TAG | cut -d'@' -f2)
-    #       echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
+      - name: Push Docker image and get digest
+        run: |
+          docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+          # Extract digest (format: sha256:abc123...)
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $REGISTRY/$IMAGE_NAME:$IMAGE_TAG | cut -d'@' -f2)
+          echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
 
-    #   - name: Sign with Cosign (Digest-Based)
-    #     env:
-    #       COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-    #       COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-    #     run: |
-    #       cosign sign --yes --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
+      - name: Sign with Cosign (Digest-Based)
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+        run: |
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
 
-    #   - name: Verify Signature
-    #     env:
-    #       COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
-    #     run: |
-    #       cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
-
-    #   #DAST STarts here.
-
-    #   - name: ZAP Scan
-    #     run: |
-    #       mkdir -p zap-reports
-    #       sudo chmod 777 zap-reports
-    #       docker run --rm \
-    #       -u root:root \
-    #       -v $(pwd)/zap-reports:/zap/wrk:rw \
-    #       -w /zap/wrk \
-    #       ghcr.io/zaproxy/zaproxy:stable \
-    #       zap-baseline.py \
-    #       -t "https://03dd-105-113-58-100.ngrok-free.app" \
-    #       -r report.html
-    #     continue-on-error: true  # Allows workflow to continue despite warnings
-
-    #   - name: Upload Report
-    #     uses: actions/upload-artifact@v4
-    #     with:
-    #       name: zap-results
-    #       path: zap-reports/report.html
-
-    #   # Force failure on any non-zero exit code
-    #   - name: Check Results
-    #     if: steps.zap-scan.conclusion != 'success'
-    #     run: |
-    #       echo "::error:: ZAP scan failed or found warnings (exit code ${{ steps.zap-scan.outcome }})"
-    #       echo "Download the report from artifacts to investigate"
-    #       exit 1  # Explicitly fail the step
-
+      - name: Verify Signature
+        env:
+          COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+        run: |
+          cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME@$DIGEST
+      
       # - name: OWASP ZAP Full Scan
       #   uses: zaproxy/action-full-scan@v0.6.0
       #   with:
       #     target: 'https://03dd-105-113-58-100.ngrok-free.app/api/v1/users'
+      #     token: ${{ secrets.GITHUB_TOKEN }}
       #     cmd_options: '-z "-config api.addheaders=true -config api.key=${ZAP_API_KEY}"'
-      #     #create_issue: false  # Disable GitHub issues
-      #     report_html: true
-      #     report_md: true
-      #     report_json: true
+      #     issue_title: 'ZAP Security Scan Findings'
+      #     fail_action: false  # Don't fail workflow on findings
       #   env:
       #     ZAP_API_KEY: ${{ secrets.API_KEY }}
-
+      
       # - name: Upload ZAP Reports
-      #   if: always()  # Upload even if scan fails
+      #   if: always()
       #   uses: actions/upload-artifact@v4
       #   with:
-      #     name: zap-reports
+      #     name: zap-security-reports
       #     path: |
-      #       report_html.html
-      #       report_md.md
-      #       report_json.json
-      
-      - name: OWASP ZAP Full Scan
-        uses: zaproxy/action-full-scan@v0.6.0
-        with:
-          target: 'https://03dd-105-113-58-100.ngrok-free.app/api/v1/users'
-          token: ${{ secrets.GITHUB_TOKEN }}
-          cmd_options: '-z "-config api.addheaders=true -config api.key=${ZAP_API_KEY}"'
-          issue_title: 'ZAP Security Scan Findings'
-          fail_action: false  # Don't fail workflow on findings
-        env:
-          ZAP_API_KEY: ${{ secrets.API_KEY }}
-      
-      - name: Upload ZAP Reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-security-reports
-          path: |
-            report.html
-            report.md
-            report.json
+      #       report.html
+      #       report.md
+      #       report.json
