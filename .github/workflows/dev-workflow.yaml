@@ -1,0 +1,145 @@
+name: Parallel Build, Scan, Sign, Push, Deploy (develop only)
+
+on:
+  push:
+    branches:
+      - develop
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: kenzman/provenance
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ env.IMAGE_TAG }}
+      digest: ${{ env.DIGEST }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Set up image tag (develop-SHORT_SHA)
+        id: versioning
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "IMAGE_TAG=develop-${SHORT_SHA}" >> $GITHUB_ENV
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build and Push Docker image
+        id: build
+        run: |
+          docker build -t $REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+          docker push $REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+          # Extract digest (format: sha256:abc123...)
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $REGISTRY/$IMAGE_NAME:$IMAGE_TAG | cut -d'@' -f2)
+          echo "DIGEST=${DIGEST}" >> $GITHUB_ENV
+
+  security-scans:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        scan_type: [sca, sast, container]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      - name: Run Snyk Scans
+        id: snyk_scan
+        run: |
+          case "${{ matrix.scan_type }}" in
+            sca)
+              mvn -N io.takari:maven:wrapper
+              snyk test --all-projects -org=ekene95 --severity-threshold=high
+              ;;
+            sast)
+              snyk code test --all-projects -org=ekene95 --severity-threshold=high
+              ;;
+            container)
+              snyk container test --org=ekene95 --tags=dev,container $REGISTRY/$IMAGE_NAME:${{ needs.setup.outputs.image_tag }} --severity-threshold=high
+              ;;
+          esac
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+
+  sign-image:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@main
+
+      - name: Sign with Cosign (Digest-Based)
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+        run: |
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY $REGISTRY/$IMAGE_NAME@${{ needs.setup.outputs.digest }}
+
+      - name: Verify Signature
+        env:
+          COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+        run: |
+          cosign verify --key env://COSIGN_PUBLIC_KEY $REGISTRY/$IMAGE_NAME@${{ needs.setup.outputs.digest }}
+
+  zap-scan:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: OWASP ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.6.0
+        with:
+          target: 'https://03dd-105-113-58-100.ngrok-free.app/api/v1/users'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          cmd_options: '-z "-config api.addheaders=true -config api.key=${ZAP_API_KEY}"'
+          issue_title: 'ZAP Security Scan Findings'
+          fail_action: false
+        env:
+          ZAP_API_KEY: ${{ secrets.API_KEY }}
+
+      - name: Upload ZAP Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-security-reports
+          path: |
+            report.html
+            report.md
+            report.json
+
+  monitor-and-fail:
+    needs: [security-scans, sign-image]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Snyk Container Monitor
+        id: snyk_monitor_result
+        run: |
+          SNYK_MONITOR_OUTPUT=$(snyk monitor --all-projects --org=ekene95)
+          ALL_SNYK_LINKS=$(echo "$SNYK_MONITOR_OUTPUT" | grep -o 'https://app.snyk.io/org/[^[:space:]]*')
+          FIRST_SNYK_LINK=$(echo "$ALL_SNYK_LINKS" | head -n 1)
+          echo "SNYK_MONITOR_URL=$FIRST_SNYK_LINK" >> $GITHUB_OUTPUT
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Fail Build on Snyk Vulnerabilities
+        if: ${{ needs.security-scans.result == 'failure' }}
+        run: |
+          echo "Snyk found vulnerabilities in the container image!"
+          SNYK_MONITOR_URL="${{ steps.snyk_monitor_result.outputs.SNYK_MONITOR_URL }}"
+          
+          if [ -n "$SNYK_MONITOR_URL" ]; then
+            echo "For more details, please visit the Snyk project: $SNYK_MONITOR_URL"
+          else
+            echo "Snyk monitor link could not be retrieved. Please check the 'Snyk Container Monitor' step logs."
+          fi
+          exit 1 
