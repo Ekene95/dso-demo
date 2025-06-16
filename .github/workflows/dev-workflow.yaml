@@ -33,18 +33,23 @@ jobs:
       - name: Install Snyk CLI
         run: npm install -g snyk
 
-      - name: Run Snyk SCA Scan
-        id: snyk_test
-        run: |
-          mvn -N io.takari:maven:wrapper
-          snyk test --all-projects -org=ekene95 --severity-threshold=high
-        continue-on-error: true
+      - name: Authenticate with snyk
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk auth $SNYK_TOKEN
 
       - name: Run Snyk SAST Scan.
         id: snyk_code_test
         run: |
           snyk code test --all-projects -org=ekene95 --severity-threshold=high
-        continue-on-error: true        
+        continue-on-error: true  
+
+      - name: Run Snyk SCA Scan
+        id: snyk_test
+        run: |
+          mvn -N io.takari:maven:wrapper
+          snyk test --all-projects -org=ekene95 --severity-threshold=high
+        continue-on-error: true      
 
       - name: Build Docker image
         run: |
