@@ -1,9 +1,9 @@
-ame: Build, Image Scan, Sign, Push Docker Image, Deploy and Scan post deployment (develop only)
+name: Build, Image Scan, Sign, Push Docker Image, Deploy and Scan post deployment (develop only)
 
 on:
   push:
     branches:
-#      - develop
+      - develop
 
 env:
   REGISTRY: docker.io
