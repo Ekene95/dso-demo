@@ -117,7 +117,8 @@ jobs:
           fail_action: false  # Don't fail workflow on findings
         env:
           ZAP_API_KEY: ${{ secrets.API_KEY }}
-           # - name: Upload ZAP Reports
+
+      - name: Upload ZAP Reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
